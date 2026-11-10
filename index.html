@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Log">
+<meta name="theme-color" content="#16221f">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<title>Training log</title>
+<style>
+:root{--bg:#f3f1ec;--fg:#16221f;--mut:#66716d;--card:#fff;--line:#d8d4ca;--acc:#0f766e;--warn:#b45309;color-scheme:light dark}
+@media(prefers-color-scheme:dark){:root{--bg:#101816;--fg:#e8ede9;--mut:#8b9a95;--card:#18231f;--line:#2a3833;--acc:#3dbfae;--warn:#e0a458}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.45 ui-rounded,"SF Pro Rounded",system-ui,sans-serif;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+main{max-width:480px;margin:0 auto;padding:16px}
+nav{display:flex;gap:4px;border-bottom:2px solid var(--line);margin-bottom:16px}
+nav button{flex:1;background:none;border:0;padding:12px 0;font:inherit;color:var(--mut);border-bottom:3px solid transparent;margin-bottom:-2px}
+nav button[aria-selected=true]{color:var(--fg);border-color:var(--acc);font-weight:700}
+section{display:none}section.on{display:block}
+label{display:block;font-size:14px;color:var(--mut);margin:12px 0 4px}
+input,select{width:100%;font:inherit;font-size:20px;padding:12px;border:1.5px solid var(--line);border-radius:10px;background:var(--card);color:var(--fg)}
+input:focus,button:focus-visible{outline:3px solid var(--acc);outline-offset:1px}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.go{width:100%;margin-top:18px;padding:14px;font:inherit;font-weight:700;font-size:18px;background:var(--acc);color:#fff;border:0;border-radius:10px}
+.alt{background:none;color:var(--fg);border:1.5px solid var(--line);font-weight:500;font-size:16px}
+.bar{display:flex;justify-content:space-between;font-size:13px;color:var(--mut);margin-bottom:12px}
+.hint{font-size:14px;color:var(--warn);min-height:1.4em;margin-top:8px}
+.big{font-size:34px;font-weight:700;letter-spacing:-.02em}
+ul{list-style:none;padding:0;margin:12px 0 0}
+li{padding:10px 0;border-top:1px solid var(--line);display:flex;justify-content:space-between;gap:8px;font-size:15px}
+li span:last-child{color:var(--mut);text-align:right}
+</style></head><body><main>
+<div class="bar"><span id="uns"></span><span id="last"></span></div>
+<nav role="tablist">
+<button role="tab" data-t="body" aria-selected="true">Body</button>
+<button role="tab" data-t="nutrition" aria-selected="false">Nutrition</button>
+<button role="tab" data-t="sync" aria-selected="false">Sync</button></nav>
+
+<section id="body" class="on">
+<div class="big" id="avg">–</div><div class="bar"><span>7-day average weight</span></div>
+<div class="row"><div><label for="w">Weight (<span class="u-w"></span>)</label><input id="w" inputmode="decimal"></div>
+<div><label for="ws">Waist (<span class="u-l"></span>)</label><input id="ws" inputmode="decimal"></div></div>
+<label for="bn">Note</label><input id="bn" placeholder="morning, fasted">
+<button class="go" id="saveB">Save measurement</button><div class="hint" id="hb"></div>
+<ul id="listB"></ul></section>
+
+<section id="nutrition">
+<label for="nd">Date</label><input id="nd" type="date">
+<div class="row"><div><label for="k">Calories</label><input id="k" inputmode="numeric"></div>
+<div><label for="p">Protein (g)</label><input id="p" inputmode="decimal"></div>
+<div><label for="c">Carbs (g)</label><input id="c" inputmode="decimal"></div>
+<div><label for="f">Fat (g)</label><input id="f" inputmode="decimal"></div></div>
+<button class="go" id="saveN">Save day</button><div class="hint" id="hn"></div>
+<ul id="listN"></ul></section>
+
+<section id="sync">
+<button class="go" id="syncNow">Sync to GitHub</button><div class="hint" id="hs"></div>
+<label for="repo">Data repo (owner/name)</label><input id="repo" autocapitalize="none" placeholder="you/workout-data">
+<label for="tok">Fine-grained token (Contents: read/write)</label><input id="tok" type="password" autocomplete="off">
+<label for="un">Units</label><select id="un"><option value="metric">kg / cm</option><option value="imperial">lb / in</option></select>
+<button class="go alt" id="saveS">Save settings</button>
+<button class="go alt" id="exp">Export all as JSONL</button></section>
+</main>
+<script>
+const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
+const cfg=()=>JSON.parse(localStorage.cfg||'{"units":"metric"}');
+const db=new Promise((ok,no)=>{const r=indexedDB.open('trainlog',1);r.onupgradeneeded=()=>r.result.createObjectStore('r',{keyPath:'id'});r.onsuccess=()=>ok(r.result);r.onerror=()=>no(r.error)});
+const tx=async(m,f)=>{const d=await db;return new Promise((ok,no)=>{const t=d.transaction('r',m),q=f(t.objectStore('r'));t.oncomplete=()=>ok(q&&q.result);t.onerror=()=>no(t.error)})};
+const all=()=>tx('readonly',s=>s.getAll()),put=r=>tx('readwrite',s=>s.put(r));
+const id=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
+const today=()=>new Date().toLocaleDateString('en-CA');
+const tz=()=>Intl.DateTimeFormat().resolvedOptions().timeZone;
+const num=e=>{const v=parseFloat($(e).value);return isFinite(v)?v:null};
+const imp=()=>cfg().units==='imperial', r2=x=>Math.round(x*100)/100;
+
+// tabs
+$$('nav button').forEach(b=>b.onclick=()=>{$$('nav button').forEach(x=>x.setAttribute('aria-selected',x===b));$$('section').forEach(s=>s.classList.toggle('on',s.id===b.dataset.t))});
+
+async function render(){
+ const rs=await all(),c=cfg();
+ $$('.u-w').forEach(e=>e.textContent=imp()?'lb':'kg');$$('.u-l').forEach(e=>e.textContent=imp()?'in':'cm');
+ const kw=x=>imp()?r2(x*2.20462):x, kl=x=>imp()?r2(x/2.54):x;
+ const body=rs.filter(r=>r.kind==='body').sort((a,b)=>b.ts.localeCompare(a.ts));
+ const wk=body.filter(r=>r.weight_kg!=null&&Date.now()-Date.parse(r.ts)<7*864e5);
+ $('#avg').textContent=wk.length?r2(kw(wk.reduce((s,r)=>s+r.weight_kg,0)/wk.length))+(imp()?' lb':' kg'):'–';
+ $('#listB').innerHTML=body.slice(0,10).map(r=>`<li><span>${r.ts.slice(0,10)}${r.note?' · '+esc(r.note):''}</span><span>${r.weight_kg!=null?kw(r.weight_kg)+(imp()?' lb':' kg'):''} ${r.waist_cm!=null?kl(r.waist_cm)+(imp()?' in':' cm'):''}</span></li>`).join('')||'<li>No measurements yet.</li>';
+ const nut=latestNut(rs);
+ $('#listN').innerHTML=Object.values(nut).sort((a,b)=>b.date.localeCompare(a.date)).slice(0,10).map(r=>`<li><span>${r.date}</span><span>${r.kcal} kcal · P${r.protein_g} C${r.carbs_g} F${r.fat_g}</span></li>`).join('')||'<li>No days logged yet.</li>';
+ const n=rs.filter(r=>!r._s).length;
+ $('#uns').textContent=n?n+' unsynced':'All synced';
+ $('#last').textContent=c.last?'Last sync '+new Date(c.last).toLocaleString([], {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}):'Never synced';
+ fillNut(nut);
+}
+const esc=s=>s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const latestNut=rs=>{const o={};rs.filter(r=>r.kind==='nutrition').sort((a,b)=>a.ts.localeCompare(b.ts)).forEach(r=>o[r.date]=r);return o};
+function fillNut(nut){const r=(nut||{})[$('#nd').value];['k','p','c','f'].forEach((e,i)=>$('#'+e).value=r?[r.kcal,r.protein_g,r.carbs_g,r.fat_g][i]:'')}
+$('#nd').value=today();
+$('#nd').onchange=async()=>fillNut(latestNut(await all()));
+
+$('#saveB').onclick=async()=>{
+ let w=num('#w'),l=num('#ws');
+ if(w==null&&l==null)return $('#hb').textContent='Enter weight or waist.';
+ if(w!=null&&imp())w=r2(w/2.20462);if(l!=null&&imp())l=r2(l*2.54);
+ await put({id:id(),v:1,kind:'body',ts:new Date().toISOString(),tz:tz(),weight_kg:w,waist_cm:l,note:$('#bn').value.trim()||undefined});
+ ['#w','#ws','#bn'].forEach(e=>$(e).value='');$('#hb').textContent='Saved.';await render();autoSync()};
+
+$('#saveN').onclick=async()=>{
+ const [k,p,c,f]=['#k','#p','#c','#f'].map(num);
+ if([k,p,c,f].some(x=>x==null||x<0))return $('#hn').textContent='Fill in all four numbers.';
+ const est=4*p+4*c+9*f,gap=Math.abs(est-k)/Math.max(k,1);
+ await put({id:id(),v:1,kind:'nutrition',ts:new Date().toISOString(),tz:tz(),date:$('#nd').value,kcal:k,protein_g:p,carbs_g:c,fat_g:f});
+ $('#hn').textContent=gap>.1?`Saved. Macros add up to ~${Math.round(est)} kcal, ${Math.round(gap*100)}% off your calories. Check for a typo.`:'Saved.';
+ await render();autoSync()};
+
+// sync
+const b64=t=>{let s='';new TextEncoder().encode(t).forEach(b=>s+=String.fromCharCode(b));return btoa(s)};
+const unb64=t=>new TextDecoder().decode(Uint8Array.from(atob(t.replace(/\n/g,'')),ch=>ch.charCodeAt(0)));
+async function sync(){
+ const c=cfg();if(!c.repo||!c.token)throw new Error('Add repo and token in settings.');
+ const rs=(await all()).filter(r=>!r._s),by={};
+ rs.forEach(r=>(by[r.kind]??=[]).push(r));
+ for(const k in by){
+  const url=`https://api.github.com/repos/${c.repo}/contents/data/${k}.jsonl`;
+  const h={Authorization:'Bearer '+c.token,Accept:'application/vnd.github+json'};
+  let sha,text='';const g=await fetch(url,{headers:h});
+  if(g.ok){const j=await g.json();sha=j.sha;text=unb64(j.content)}else if(g.status!==404)throw new Error('GitHub read failed ('+g.status+').');
+  const have=new Set(text.split('\n').filter(Boolean).map(l=>JSON.parse(l).id));
+  const add=by[k].filter(r=>!have.has(r.id));
+  if(add.length){
+   if(text&&!text.endsWith('\n'))text+='\n';
+   text+=add.map(r=>{const{_s,...o}=r;return JSON.stringify(o)}).join('\n')+'\n';
+   const p=await fetch(url,{method:'PUT',headers:h,body:JSON.stringify({message:`log ${k} +${add.length}`,content:b64(text),sha})});
+   if(!p.ok)throw new Error('GitHub write failed ('+p.status+').')}
+  for(const r of by[k]){r._s=1;await put(r)}}
+ localStorage.cfg=JSON.stringify({...cfg(),last:Date.now()});
+}
+const run=async()=>{$('#hs').textContent='Syncing…';try{await sync();$('#hs').textContent='Synced.'}catch(e){$('#hs').textContent=e.message}await render()};
+const autoSync=()=>{const c=cfg();if(navigator.onLine&&c.repo&&c.token)run()};
+$('#syncNow').onclick=run;
+$('#saveS').onclick=()=>{localStorage.cfg=JSON.stringify({...cfg(),repo:$('#repo').value.trim(),token:$('#tok').value.trim()||cfg().token,units:$('#un').value});$('#tok').value='';$('#hs').textContent='Settings saved.';render()};
+$('#exp').onclick=async()=>{const rs=await all();const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([rs.map(r=>JSON.stringify(r)).join('\n')],{type:'application/jsonl'}));a.download='trainlog-export.jsonl';a.click()};
+$('#repo').value=cfg().repo||'';$('#un').value=cfg().units||'metric';
+addEventListener('online',autoSync);
+try{navigator.storage?.persist?.()}catch(e){}
+if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js');
+render();
+</script></body></html>
