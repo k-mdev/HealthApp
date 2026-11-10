@@ -127,6 +127,48 @@
    ],
    "equipment": "dumbbell",
    "per_side": true
+  },
+  {
+   "id": "incline_bench_press",
+   "name": "Incline bench press",
+   "pattern": "horizontal_push",
+   "equipment": "barbell",
+   "per_side": false
+  },
+  {
+   "id": "lat_pulldown",
+   "name": "Lat pulldown",
+   "pattern": "vertical_pull",
+   "equipment": "machine",
+   "per_side": false
+  },
+  {
+   "id": "face_pull",
+   "name": "Face pull",
+   "pattern": "horizontal_pull",
+   "equipment": "cable",
+   "per_side": false
+  },
+  {
+   "id": "curl",
+   "name": "Curl",
+   "pattern": "elbow_flexion",
+   "equipment": "unspecified",
+   "per_side": false
+  },
+  {
+   "id": "tricep_pushdown",
+   "name": "Triceps pushdown",
+   "pattern": "elbow_extension",
+   "equipment": "cable",
+   "per_side": false
+  },
+  {
+   "id": "single_leg_press",
+   "name": "Single leg press",
+   "pattern": "squat",
+   "equipment": "machine",
+   "per_side": false
   }
  ]
 }
