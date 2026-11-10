@@ -15,7 +15,7 @@
 body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.45 ui-rounded,"SF Pro Rounded",system-ui,sans-serif;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
 main{max-width:480px;margin:0 auto;padding:16px}
 nav{display:flex;gap:4px;border-bottom:2px solid var(--line);margin-bottom:16px}
-nav button{flex:1;background:none;border:0;padding:12px 0;font:inherit;color:var(--mut);border-bottom:3px solid transparent;margin-bottom:-2px}
+nav button{font-size:14px;flex:1;background:none;border:0;padding:12px 0;font:inherit;color:var(--mut);border-bottom:3px solid transparent;margin-bottom:-2px}
 nav button[aria-selected=true]{color:var(--fg);border-color:var(--acc);font-weight:700}
 section{display:none}section.on{display:block}
 label{display:block;font-size:14px;color:var(--mut);margin:12px 0 4px}
@@ -27,6 +27,7 @@ input:focus,button:focus-visible{outline:3px solid var(--acc);outline-offset:1px
 .bar{display:flex;justify-content:space-between;font-size:13px;color:var(--mut);margin-bottom:12px}
 .hint{font-size:14px;color:var(--warn);min-height:1.4em;margin-top:8px}
 .big{font-size:34px;font-weight:700;letter-spacing:-.02em}
+.x{background:none;border:0;color:var(--mut);font-size:18px;padding:0 8px}h3{font-size:15px;margin:22px 0 0;color:var(--mut);font-weight:600}
 ul{list-style:none;padding:0;margin:12px 0 0}
 li{padding:10px 0;border-top:1px solid var(--line);display:flex;justify-content:space-between;gap:8px;font-size:15px}
 li span:last-child{color:var(--mut);text-align:right}
@@ -35,6 +36,8 @@ li span:last-child{color:var(--mut);text-align:right}
 <nav role="tablist">
 <button role="tab" data-t="body" aria-selected="true">Body</button>
 <button role="tab" data-t="nutrition" aria-selected="false">Nutrition</button>
+<button role="tab" data-t="cardio" aria-selected="false">Cardio</button>
+<button role="tab" data-t="lift" aria-selected="false">Lift</button>
 <button role="tab" data-t="sync" aria-selected="false">Sync</button></nav>
 
 <section id="body" class="on">
@@ -54,6 +57,23 @@ li span:last-child{color:var(--mut);text-align:right}
 <button class="go" id="saveN">Save day</button><div class="hint" id="hn"></div>
 <ul id="listN"></ul></section>
 
+<section id="cardio">
+<label for="ca">Activity</label><select id="ca"><option value="run">Run</option><option value="bike">Bike</option><option value="walk">Walk</option><option value="row">Row</option><option value="swim">Swim</option></select>
+<div class="row"><div><label for="cm">Time (min)</label><input id="cm" inputmode="decimal"></div>
+<div><label for="cd">Distance (<span class="u-d"></span>)</label><input id="cd" inputmode="decimal"></div></div>
+<label for="ch">Avg heart rate (optional)</label><input id="ch" inputmode="numeric">
+<button class="go" id="saveC">Save cardio</button><div class="hint" id="hc"></div><ul id="listC"></ul></section>
+
+<section id="lift">
+<label for="ex">Exercise</label><select id="ex"></select>
+<div class="row"><div><label for="lr" id="lrl">Reps</label><input id="lr" inputmode="numeric"></div>
+<div><label for="lw" id="lwl">Weight</label><input id="lw" inputmode="decimal"></div></div>
+<button class="go" id="addS">Add set</button>
+<button class="go alt" id="copyL">Copy last session</button>
+<ul id="draft"></ul>
+<button class="go" id="saveL">Save exercise</button><div class="hint" id="hl"></div>
+<h3>This week's volume</h3><ul id="wkv"></ul><h3>Recent lifts</h3><ul id="listL"></ul></section>
+
 <section id="sync">
 <button class="go" id="syncNow">Sync to GitHub</button><div class="hint" id="hs"></div>
 <label for="repo">Data repo (owner/name)</label><input id="repo" autocapitalize="none" placeholder="you/workout-data">
@@ -64,7 +84,7 @@ li span:last-child{color:var(--mut);text-align:right}
 </main>
 <script>
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
-const cfg=()=>JSON.parse(localStorage.cfg||'{"units":"metric"}');
+const cfg=()=>JSON.parse(localStorage.cfg||'{"units":"imperial"}');
 const db=new Promise((ok,no)=>{const r=indexedDB.open('trainlog',1);r.onupgradeneeded=()=>r.result.createObjectStore('r',{keyPath:'id'});r.onsuccess=()=>ok(r.result);r.onerror=()=>no(r.error)});
 const tx=async(m,f)=>{const d=await db;return new Promise((ok,no)=>{const t=d.transaction('r',m),q=f(t.objectStore('r'));t.oncomplete=()=>ok(q&&q.result);t.onerror=()=>no(t.error)})};
 const all=()=>tx('readonly',s=>s.getAll()),put=r=>tx('readwrite',s=>s.put(r));
@@ -90,7 +110,7 @@ async function render(){
  const n=rs.filter(r=>!r._s).length;
  $('#uns').textContent=n?n+' unsynced':'All synced';
  $('#last').textContent=c.last?'Last sync '+new Date(c.last).toLocaleString([], {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}):'Never synced';
- fillNut(nut);
+ fillNut(nut);renderW(rs);
 }
 const esc=s=>s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const latestNut=rs=>{const o={};rs.filter(r=>r.kind==='nutrition').sort((a,b)=>a.ts.localeCompare(b.ts)).forEach(r=>o[r.date]=r);return o};
@@ -112,6 +132,51 @@ $('#saveN').onclick=async()=>{
  await put({id:id(),v:1,kind:'nutrition',ts:new Date().toISOString(),tz:tz(),date:$('#nd').value,kcal:k,protein_g:p,carbs_g:c,fat_g:f});
  $('#hn').textContent=gap>.1?`Saved. Macros add up to ~${Math.round(est)} kcal, ${Math.round(gap*100)}% off your calories. Check for a typo.`:'Saved.';
  await render();autoSync()};
+
+// cardio + lifting
+const KM=()=>imp()?1609.344:1000;
+const CAT=[["barbell_bench_press","Barbell bench press","horizontal_push",0],["db_bench_press","Dumbbell bench press","horizontal_push",1],["db_shoulder_press","Dumbbell shoulder press","vertical_push",1],["overhead_press","Overhead press","vertical_push",0],["barbell_row","Barbell row","horizontal_pull",0],["db_row","Dumbbell row","horizontal_pull",1],["pull_up","Pull-up","vertical_pull",0,"bw"],["back_squat","Back squat","squat",0],["leg_press","Leg press","squat",0],["deadlift","Deadlift","hinge",0],["plank","Plank","core",0,"time"]].map(([id,name,pattern,ps,f])=>({id,name,pattern,ps,bw:f==="bw",time:f==="time"}));
+const lbk=x=>imp()?r2(x*2.20462):x,unitW=()=>imp()?'lb':'kg';
+const vol=(e,sets,bw)=>sets.reduce((s,t)=>s+(t.reps||0)*((e.bw?bw:0)+(t.weight_kg||0))*(e.ps?2:1),0);
+const e1rm=t=>t.reps?t.weight_kg*(1+t.reps/30):0;
+const fmtV=x=>Math.round(lbk(x)).toLocaleString()+' '+unitW();
+const lastOf=(rs,x)=>rs.filter(r=>r.kind==='lift'&&r.exercise_id===x).sort((a,b)=>b.ts.localeCompare(a.ts))[0];
+const bwOf=rs=>(rs.filter(r=>r.kind==='body'&&r.weight_kg!=null).sort((a,b)=>b.ts.localeCompare(a.ts))[0]||{}).weight_kg||0;
+const cur=()=>CAT.find(x=>x.id===$('#ex').value);
+let draft=[];
+function renderW(rs){
+ if(!$('#ex').options.length)$('#ex').innerHTML=CAT.map(x=>`<option value="${x.id}">${x.name}</option>`).join('');
+ $$('.u-d').forEach(x=>x.textContent=imp()?'mi':'km');
+ const e=cur(),bw=bwOf(rs);
+ $('#lrl').textContent=e.time?'Seconds':'Reps';
+ $('#lwl').textContent=(e.bw?'Added weight':'Weight')+' ('+unitW()+(e.ps?', per dumbbell':'')+')';
+ $('#copyL').hidden=!lastOf(rs,e.id);
+ $('#draft').innerHTML=draft.map((t,i)=>`<li><span>Set ${i+1}: ${t.duration_s?t.duration_s+' s':t.reps+' × '+lbk(t.weight_kg)+' '+unitW()}</span><button class="x" data-i="${i}" aria-label="Remove set ${i+1}">✕</button></li>`).join('');
+ const lifts=rs.filter(r=>r.kind==='lift').sort((a,b)=>b.ts.localeCompare(a.ts)),g={};
+ lifts.filter(r=>Date.now()-Date.parse(r.ts)<7*864e5).forEach(r=>{const x=CAT.find(c=>c.id===r.exercise_id);if(x)g[x.pattern]=(g[x.pattern]||0)+vol(x,r.sets,bw)});
+ $('#wkv').innerHTML=Object.entries(g).map(([k,v])=>`<li><span>${k.replace('_',' ')}</span><span>${fmtV(v)}</span></li>`).join('')||'<li>No lifts in the last 7 days.</li>';
+ $('#listL').innerHTML=lifts.slice(0,8).map(r=>{const x=CAT.find(c=>c.id===r.exercise_id)||{name:r.exercise_id};return `<li><span>${r.date} · ${x.name}</span><span>${r.sets.length} sets · ${fmtV(vol(x,r.sets,bw))}</span></li>`}).join('')||'<li>No lifts yet.</li>';
+ const dist=r=>r2(r.distance_m/KM())+(imp()?' mi':' km'),pace=r=>{const t=Math.round(r.duration_s/(r.distance_m/KM()));return Math.floor(t/60)+':'+String(t%60).padStart(2,'0')+(imp()?' /mi':' /km')};
+ $('#listC').innerHTML=rs.filter(r=>r.kind==='cardio').sort((a,b)=>b.ts.localeCompare(a.ts)).slice(0,10).map(r=>`<li><span>${r.date} · ${r.activity}</span><span>${dist(r)} · ${Math.round(r.duration_s/60)} min · ${pace(r)}</span></li>`).join('')||'<li>No cardio yet.</li>';
+}
+async function pre(){const l=lastOf(await all(),$('#ex').value),t=l&&l.sets[l.sets.length-1];$('#lr').value=t?(t.reps??t.duration_s??''):'';$('#lw').value=t&&t.weight_kg!=null?lbk(t.weight_kg):'';draft=[];await render()}
+$('#ex').onchange=pre;
+$('#addS').onclick=()=>{const e=cur(),r=num('#lr');let w=num('#lw');
+ if(!r||r<=0)return $('#hl').textContent=e.time?'Enter seconds.':'Enter reps.';
+ if(e.time)draft.push({duration_s:r});
+ else{if(w==null&&e.bw)w=0;if(w==null)return $('#hl').textContent='Enter a weight.';draft.push({reps:r,weight_kg:imp()?r2(w/2.20462):w})}
+ $('#hl').textContent='';render()};
+$('#copyL').onclick=async()=>{const l=lastOf(await all(),$('#ex').value);if(l){draft=l.sets.map(s=>({...s}));render()}};
+$('#draft').onclick=e=>{const b=e.target.closest('.x');if(b){draft.splice(+b.dataset.i,1);render()}};
+$('#saveL').onclick=async()=>{
+ if(!draft.length)return $('#hl').textContent='Add at least one set.';
+ const e=cur(),v=vol(e,draft,bwOf(await all())),best=Math.max(0,...draft.map(e1rm));
+ await put({id:id(),v:1,kind:'lift',ts:new Date().toISOString(),tz:tz(),date:today(),exercise_id:e.id,sets:draft});
+ draft=[];$('#hl').textContent='Saved. Volume '+fmtV(v)+(best?', best est. 1RM '+Math.round(lbk(best))+' '+unitW():'')+'.';await render();autoSync()};
+$('#saveC').onclick=async()=>{const m=num('#cm'),d=num('#cd');
+ if(!m||!d)return $('#hc').textContent='Enter time and distance.';
+ await put({id:id(),v:1,kind:'cardio',ts:new Date().toISOString(),tz:tz(),date:today(),activity:$('#ca').value,duration_s:Math.round(m*60),distance_m:Math.round(d*KM()),avg_hr:num('#ch')??undefined});
+ ['#cm','#cd','#ch'].forEach(x=>$(x).value='');$('#hc').textContent='Saved.';await render();autoSync()};
 
 // sync
 const b64=t=>{let s='';new TextEncoder().encode(t).forEach(b=>s+=String.fromCharCode(b));return btoa(s)};
@@ -140,9 +205,9 @@ const autoSync=()=>{const c=cfg();if(navigator.onLine&&c.repo&&c.token)run()};
 $('#syncNow').onclick=run;
 $('#saveS').onclick=()=>{localStorage.cfg=JSON.stringify({...cfg(),repo:$('#repo').value.trim(),token:$('#tok').value.trim()||cfg().token,units:$('#un').value});$('#tok').value='';$('#hs').textContent='Settings saved.';render()};
 $('#exp').onclick=async()=>{const rs=await all();const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([rs.map(r=>JSON.stringify(r)).join('\n')],{type:'application/jsonl'}));a.download='trainlog-export.jsonl';a.click()};
-$('#repo').value=cfg().repo||'';$('#un').value=cfg().units||'metric';
+$('#repo').value=cfg().repo||'';$('#un').value=cfg().units||"imperial";
 addEventListener('online',autoSync);
 try{navigator.storage?.persist?.()}catch(e){}
 if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js');
-render();
+render().then(pre);
 </script></body></html>

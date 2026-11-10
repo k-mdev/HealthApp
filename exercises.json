@@ -1,11 +1,132 @@
-{"v":1,"exercises":[
-{"id":"barbell_bench_press","name":"Barbell bench press","pattern":"horizontal_push","muscles":["chest","triceps","front_delt"],"equipment":"barbell","per_side":false},
-{"id":"db_bench_press","name":"Dumbbell bench press","pattern":"horizontal_push","muscles":["chest","triceps","front_delt"],"equipment":"dumbbell","per_side":true},
-{"id":"overhead_press","name":"Overhead press","pattern":"vertical_push","muscles":["shoulders","triceps"],"equipment":"barbell","per_side":false},
-{"id":"barbell_row","name":"Barbell row","pattern":"horizontal_pull","muscles":["lats","upper_back","biceps"],"equipment":"barbell","per_side":false},
-{"id":"pull_up","name":"Pull-up","pattern":"vertical_pull","muscles":["lats","biceps"],"equipment":"bodyweight","per_side":false,"bodyweight":true},
-{"id":"back_squat","name":"Back squat","pattern":"squat","muscles":["quads","glutes"],"equipment":"barbell","per_side":false},
-{"id":"deadlift","name":"Deadlift","pattern":"hinge","muscles":["hamstrings","glutes","back"],"equipment":"barbell","per_side":false},
-{"id":"leg_press","name":"Leg press","pattern":"squat","muscles":["quads","glutes"],"equipment":"machine","per_side":false},
-{"id":"plank","name":"Plank","pattern":"core","muscles":["abs"],"equipment":"bodyweight","per_side":false,"timed":true}
-]}
+{
+ "v": 1,
+ "exercises": [
+  {
+   "id": "barbell_bench_press",
+   "name": "Barbell bench press",
+   "pattern": "horizontal_push",
+   "muscles": [
+    "chest",
+    "triceps",
+    "front_delt"
+   ],
+   "equipment": "barbell",
+   "per_side": false
+  },
+  {
+   "id": "db_bench_press",
+   "name": "Dumbbell bench press",
+   "pattern": "horizontal_push",
+   "muscles": [
+    "chest",
+    "triceps",
+    "front_delt"
+   ],
+   "equipment": "dumbbell",
+   "per_side": true
+  },
+  {
+   "id": "overhead_press",
+   "name": "Overhead press",
+   "pattern": "vertical_push",
+   "muscles": [
+    "shoulders",
+    "triceps"
+   ],
+   "equipment": "barbell",
+   "per_side": false
+  },
+  {
+   "id": "barbell_row",
+   "name": "Barbell row",
+   "pattern": "horizontal_pull",
+   "muscles": [
+    "lats",
+    "upper_back",
+    "biceps"
+   ],
+   "equipment": "barbell",
+   "per_side": false
+  },
+  {
+   "id": "pull_up",
+   "name": "Pull-up",
+   "pattern": "vertical_pull",
+   "muscles": [
+    "lats",
+    "biceps"
+   ],
+   "equipment": "bodyweight",
+   "per_side": false,
+   "bodyweight": true
+  },
+  {
+   "id": "back_squat",
+   "name": "Back squat",
+   "pattern": "squat",
+   "muscles": [
+    "quads",
+    "glutes"
+   ],
+   "equipment": "barbell",
+   "per_side": false
+  },
+  {
+   "id": "deadlift",
+   "name": "Deadlift",
+   "pattern": "hinge",
+   "muscles": [
+    "hamstrings",
+    "glutes",
+    "back"
+   ],
+   "equipment": "barbell",
+   "per_side": false
+  },
+  {
+   "id": "leg_press",
+   "name": "Leg press",
+   "pattern": "squat",
+   "muscles": [
+    "quads",
+    "glutes"
+   ],
+   "equipment": "machine",
+   "per_side": false
+  },
+  {
+   "id": "plank",
+   "name": "Plank",
+   "pattern": "core",
+   "muscles": [
+    "abs"
+   ],
+   "equipment": "bodyweight",
+   "per_side": false,
+   "timed": true
+  },
+  {
+   "id": "db_shoulder_press",
+   "name": "Dumbbell shoulder press",
+   "pattern": "vertical_push",
+   "muscles": [
+    "shoulders",
+    "triceps"
+   ],
+   "equipment": "dumbbell",
+   "per_side": true
+  },
+  {
+   "id": "db_row",
+   "name": "Dumbbell row",
+   "pattern": "horizontal_pull",
+   "muscles": [
+    "lats",
+    "upper_back",
+    "biceps"
+   ],
+   "equipment": "dumbbell",
+   "per_side": true
+  }
+ ]
+}

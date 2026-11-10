@@ -5,3 +5,7 @@ body.jsonl      {"id","v":1,"kind":"body","ts":ISO-UTC,"tz":IANA,"weight_kg"?,"w
 nutrition.jsonl {"id","v":1,"kind":"nutrition","ts","tz","date":"YYYY-MM-DD","kcal","protein_g","carbs_g","fat_g"}
   - Latest `ts` per `date` wins (re-saving a day = correction; old lines stay as history).
 Next: workouts.jsonl (per-set, exercise_id references exercises.json), cardio in the same file.
+
+cardio.jsonl {"id","v":1,"kind":"cardio","ts","tz","date","activity","duration_s","distance_m","avg_hr"?}
+lift.jsonl   {"id","v":1,"kind":"lift","ts","tz","date","exercise_id","sets":[{"reps","weight_kg"} | {"duration_s"}]}
+  - weight_kg is per dumbbell for per_side exercises; volume doubles it. Pull-ups store added weight (0 = bodyweight only).
