@@ -240,7 +240,7 @@ async function sync(){
  for(const k in by){
   const url=`https://api.github.com/repos/${c.repo}/contents/data/${k}.jsonl`;
   const h={Authorization:'Bearer '+c.token,Accept:'application/vnd.github+json'};
-  let sha,text='';const g=await fetch(url,{headers:h});
+  let sha,text='';const g=await fetch(url,{headers:h,cache:'no-store'});
   if(g.ok){const j=await g.json();sha=j.sha;text=unb64(j.content)}else if(g.status!==404)throw new Error('GitHub read failed ('+g.status+').');
   const have=new Set(text.split('\n').filter(Boolean).map(l=>JSON.parse(l).id));
   const add=by[k].filter(r=>!have.has(r.id));
@@ -255,11 +255,11 @@ async function sync(){
 async function pull(){const c=cfg();if(!c.repo||!c.token)throw new Error('Add repo and token in settings.');
  const have=new Set((await all()).map(r=>r.id));
  for(const k of['body','nutrition','cardio','lift']){
-  const g=await fetch(`https://api.github.com/repos/${c.repo}/contents/data/${k}.jsonl`,{headers:{Authorization:'Bearer '+c.token,Accept:'application/vnd.github+json'}});
+  const g=await fetch(`https://api.github.com/repos/${c.repo}/contents/data/${k}.jsonl`,{cache:'no-store',headers:{Authorization:'Bearer '+c.token,Accept:'application/vnd.github+json'}});
   if(g.status===404)continue;if(!g.ok)throw new Error('GitHub read failed ('+g.status+').');
   for(const l of unb64((await g.json()).content).split('\n').filter(Boolean)){const r=JSON.parse(l);if(!have.has(r.id))await put({...r,_s:1})}}}
 $('#pull').onclick=async()=>{$('#hs').textContent='Restoring…';try{await pull();$('#hs').textContent='Restored from GitHub.'}catch(e){$('#hs').textContent=e.message}await render()};
-const run=async()=>{$('#hs').textContent='Syncing…';try{await sync();$('#hs').textContent='Synced.'}catch(e){$('#hs').textContent=e.message}await render()};
+const run=async()=>{$('#hs').textContent='Syncing…';try{await pull();await sync();$('#hs').textContent='Synced.'}catch(e){$('#hs').textContent=e.message}await render()};
 const autoSync=()=>{const c=cfg();if(navigator.onLine&&c.repo&&c.token)run()};
 $('#syncNow').onclick=run;
 $('#saveS').onclick=()=>{localStorage.cfg=JSON.stringify({...cfg(),repo:$('#repo').value.trim(),token:$('#tok').value.trim()||cfg().token,units:$('#un').value});$('#tok').value='';$('#hs').textContent='Settings saved.';render()};
@@ -268,5 +268,5 @@ $('#repo').value=cfg().repo||'';$('#un').value=cfg().units||"imperial";
 addEventListener('online',autoSync);
 try{navigator.storage?.persist?.()}catch(e){}
 if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js');
-render().then(pre);
+render().then(pre).then(autoSync);
 </script></body></html>
