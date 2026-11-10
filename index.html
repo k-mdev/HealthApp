@@ -15,7 +15,7 @@
 body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.45 ui-rounded,"SF Pro Rounded",system-ui,sans-serif;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
 main{max-width:480px;margin:0 auto;padding:16px}
 nav{display:flex;gap:4px;border-bottom:2px solid var(--line);margin-bottom:16px}
-nav button{font-size:14px;flex:1;background:none;border:0;padding:12px 0;font:inherit;color:var(--mut);border-bottom:3px solid transparent;margin-bottom:-2px}
+nav button{font-size:13px;flex:1;background:none;border:0;padding:12px 0;font:inherit;color:var(--mut);border-bottom:3px solid transparent;margin-bottom:-2px}
 nav button[aria-selected=true]{color:var(--fg);border-color:var(--acc);font-weight:700}
 section{display:none}section.on{display:block}
 label{display:block;font-size:14px;color:var(--mut);margin:12px 0 4px}
@@ -27,6 +27,7 @@ input:focus,button:focus-visible{outline:3px solid var(--acc);outline-offset:1px
 .bar{display:flex;justify-content:space-between;font-size:13px;color:var(--mut);margin-bottom:12px}
 .hint{font-size:14px;color:var(--warn);min-height:1.4em;margin-top:8px}
 .big{font-size:34px;font-weight:700;letter-spacing:-.02em}
+i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:8px}svg text{fill:var(--mut)}
 .x{background:none;border:0;color:var(--mut);font-size:18px;padding:0 8px}h3{font-size:15px;margin:22px 0 0;color:var(--mut);font-weight:600}
 ul{list-style:none;padding:0;margin:12px 0 0}
 li{padding:10px 0;border-top:1px solid var(--line);display:flex;justify-content:space-between;gap:8px;font-size:15px}
@@ -35,9 +36,10 @@ li span:last-child{color:var(--mut);text-align:right}
 <div class="bar"><span id="uns"></span><span id="last"></span></div>
 <nav role="tablist">
 <button role="tab" data-t="body" aria-selected="true">Body</button>
-<button role="tab" data-t="nutrition" aria-selected="false">Nutrition</button>
+<button role="tab" data-t="nutrition" aria-selected="false">Food</button>
 <button role="tab" data-t="cardio" aria-selected="false">Cardio</button>
 <button role="tab" data-t="lift" aria-selected="false">Lift</button>
+<button role="tab" data-t="trends" aria-selected="false">Trends</button>
 <button role="tab" data-t="sync" aria-selected="false">Sync</button></nav>
 
 <section id="body" class="on">
@@ -74,11 +76,19 @@ li span:last-child{color:var(--mut);text-align:right}
 <button class="go" id="saveL">Save exercise</button><div class="hint" id="hl"></div>
 <h3>This week's volume</h3><ul id="wkv"></ul><h3>Recent lifts</h3><ul id="listL"></ul></section>
 
+<section id="trends">
+<h3>Weight (<span class="u-w"></span>) with 7-day average</h3><div id="cw"></div>
+<h3>Waist (<span class="u-l"></span>)</h3><div id="cs"></div>
+<h3>Weekly lifting volume (<span class="u-w"></span>)</h3><div id="cv"></div><ul id="lg"></ul>
+<h3>Run pace (min per <span class="u-d"></span>, lower is faster)</h3><div id="cp"></div>
+<h3>Calories, last 30 days</h3><div id="ck"></div><div class="bar" id="ka"></div></section>
+
 <section id="sync">
 <button class="go" id="syncNow">Sync to GitHub</button><div class="hint" id="hs"></div>
 <label for="repo">Data repo (owner/name)</label><input id="repo" autocapitalize="none" placeholder="you/workout-data">
 <label for="tok">Fine-grained token (Contents: read/write)</label><input id="tok" type="password" autocomplete="off">
 <label for="un">Units</label><select id="un"><option value="metric">kg / cm</option><option value="imperial">lb / in</option></select>
+<button class="go alt" id="pull">Restore from GitHub</button>
 <button class="go alt" id="saveS">Save settings</button>
 <button class="go alt" id="exp">Export all as JSONL</button></section>
 </main>
@@ -110,7 +120,7 @@ async function render(){
  const n=rs.filter(r=>!r._s).length;
  $('#uns').textContent=n?n+' unsynced':'All synced';
  $('#last').textContent=c.last?'Last sync '+new Date(c.last).toLocaleString([], {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}):'Never synced';
- fillNut(nut);renderW(rs);
+ fillNut(nut);renderW(rs);renderT(rs,nut);
 }
 const esc=s=>s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const latestNut=rs=>{const o={};rs.filter(r=>r.kind==='nutrition').sort((a,b)=>a.ts.localeCompare(b.ts)).forEach(r=>o[r.date]=r);return o};
@@ -133,9 +143,51 @@ $('#saveN').onclick=async()=>{
  $('#hn').textContent=gap>.1?`Saved. Macros add up to ~${Math.round(est)} kcal, ${Math.round(gap*100)}% off your calories. Check for a typo.`:'Saved.';
  await render();autoSync()};
 
+// charts (inline SVG, no libraries)
+const nice=(lo,hi)=>{if(hi===lo){hi+=1;lo-=1}const p=(hi-lo)*.1;return[lo-p,hi+p]};
+const fd=t=>new Date(t).toLocaleDateString([],{month:'short',day:'numeric'});
+const n1=v=>Math.round(v*10)/10,mmss=v=>{const t=Math.round(v*60);return Math.floor(t/60)+':'+String(t%60).padStart(2,'0')};
+const svg=b=>`<svg viewBox="0 0 320 172" role="img" style="width:100%;font-size:10px">${b}</svg>`;
+function frame(yl,yh,xl,xh,fy,fx){
+ const sx=x=>38+(x-xl)/(xh-xl||1)*274,sy=y=>150-(y-yl)/(yh-yl)*140;let g='';
+ for(let i=0;i<=3;i++){const v=yl+(yh-yl)*i/3;g+=`<line x1="38" x2="312" y1="${sy(v).toFixed(1)}" y2="${sy(v).toFixed(1)}" style="stroke:var(--line)"/><text x="34" y="${(sy(v)+3).toFixed(1)}" text-anchor="end">${fy(v)}</text>`}
+ return{sx,sy,g:g+`<text x="38" y="166">${fx(xl)}</text><text x="312" y="166" text-anchor="end">${fx(xh)}</text>`}}
+function line(el,series,fy){
+ const all=series.flatMap(s=>s.p);if(!all.length){$(el).innerHTML='<p class="bar">No data yet.</p>';return}
+ const xs=all.map(a=>a[0]),ys=all.map(a=>a[1]),[yl,yh]=nice(Math.min(...ys),Math.max(...ys));
+ const f=frame(yl,yh,Math.min(...xs),Math.max(...xs),fy,fd);let b=f.g;
+ series.forEach(s=>{
+  if(s.line&&s.p.length>1)b+=`<path d="${s.p.map((a,i)=>(i?'L':'M')+f.sx(a[0]).toFixed(1)+' '+f.sy(a[1]).toFixed(1)).join('')}" style="fill:none;stroke:${s.c};stroke-width:2"/>`;
+  if(s.dots)b+=s.p.map(a=>`<circle cx="${f.sx(a[0]).toFixed(1)}" cy="${f.sy(a[1]).toFixed(1)}" r="2.5" style="fill:${s.c}"/>`).join('')});
+ $(el).innerHTML=svg(b)}
+function bars(el,cols,xl,xh,fy){
+ const mx=Math.max(1,...cols.map(c=>c.reduce((s,a)=>s+a[0],0)))*1.08,f=frame(0,mx,xl,xh,fy,fd),w=274/cols.length;let b=f.g;
+ cols.forEach((c,i)=>{let acc=0;c.forEach(([v,col])=>{if(v>0){b+=`<rect x="${(38+i*w+w*.12).toFixed(1)}" width="${(w*.76).toFixed(1)}" y="${f.sy(acc+v).toFixed(1)}" height="${(f.sy(acc)-f.sy(acc+v)).toFixed(1)}" style="fill:${col}"/>`;acc+=v}})});
+ $(el).innerHTML=svg(b)}
+const wkStart=t=>{const d=new Date(t);d.setDate(d.getDate()-(d.getDay()+6)%7);d.setHours(0,0,0,0);return d.getTime()};
+function renderT(rs,nut){
+ const ws=rs.filter(r=>r.kind==='body'&&r.weight_kg!=null).map(r=>[Date.parse(r.ts),r.weight_kg]).sort((a,b)=>a[0]-b[0]);
+ const avg=ws.map(([t])=>{const w=ws.filter(a=>a[0]<=t&&t-a[0]<7*864e5);return[t,w.reduce((s,a)=>s+a[1],0)/w.length]});
+ line('#cw',[{p:ws.map(a=>[a[0],lbk(a[1])]),c:'var(--mut)',dots:1},{p:avg.map(a=>[a[0],lbk(a[1])]),c:'var(--acc)',line:1}],n1);
+ const wa=rs.filter(r=>r.kind==='body'&&r.waist_cm!=null).map(r=>[Date.parse(r.ts),imp()?r2(r.waist_cm/2.54):r.waist_cm]).sort((a,b)=>a[0]-b[0]);
+ line('#cs',[{p:wa,c:'var(--acc)',line:1,dots:1}],n1);
+ const runs=rs.filter(r=>r.kind==='cardio'&&r.activity==='run'&&r.distance_m>0).map(r=>[Date.parse(r.ts),r.duration_s/60/(r.distance_m/KM())]).sort((a,b)=>a[0]-b[0]);
+ line('#cp',[{p:runs,c:'var(--acc)',line:1,dots:1}],mmss);
+ const bw=bwOf(rs),w0=wkStart(Date.now()),weeks=[...Array(12)].map((_,i)=>{const d=new Date(w0);d.setDate(d.getDate()-7*(11-i));return d.getTime()});
+ const g={},pats=new Set();
+ rs.filter(r=>r.kind==='lift').forEach(r=>{const x=CAT.find(c=>c.id===r.exercise_id),i=weeks.indexOf(wkStart(Date.parse(r.ts)));if(!x||i<0)return;pats.add(x.pattern);(g[i]??={})[x.pattern]=(g[i][x.pattern]||0)+vol(x,r.sets,bw)});
+ const pl=[...pats].sort(),col=p=>`hsl(${(pl.indexOf(p)*57+160)%360} 48% 52%)`;
+ bars('#cv',weeks.map((_,i)=>pl.map(p=>[(g[i]||{})[p]||0,col(p)])),weeks[0],weeks[11],v=>Math.round(lbk(v)).toLocaleString());
+ $('#lg').innerHTML=pl.map(p=>`<li><span><i style="background:${col(p)}"></i>${p.replace('_',' ')}</span></li>`).join('');
+ const days=[...Array(30)].map((_,i)=>{const d=new Date();d.setDate(d.getDate()-(29-i));return d.toLocaleDateString('en-CA')});
+ bars('#ck',days.map(k=>[[nut[k]?nut[k].kcal:0,'var(--acc)']]),new Date(days[0]+'T12:00').getTime(),new Date(days[29]+'T12:00').getTime(),v=>Math.round(v));
+ const logged=days.map(k=>nut[k]).filter(Boolean),m=k=>Math.round(logged.reduce((s,r)=>s+r[k],0)/logged.length);
+ $('#ka').textContent=logged.length?`Average over ${logged.length} logged days: ${m('kcal')} kcal · P${m('protein_g')} C${m('carbs_g')} F${m('fat_g')}`:'No nutrition logged in the last 30 days.';
+}
+
 // cardio + lifting
 const KM=()=>imp()?1609.344:1000;
-const CAT=[["barbell_bench_press","Barbell bench press","horizontal_push",0],["db_bench_press","Dumbbell bench press","horizontal_push",1],["db_shoulder_press","Dumbbell shoulder press","vertical_push",1],["overhead_press","Overhead press","vertical_push",0],["barbell_row","Barbell row","horizontal_pull",0],["db_row","Dumbbell row","horizontal_pull",1],["pull_up","Pull-up","vertical_pull",0,"bw"],["back_squat","Back squat","squat",0],["leg_press","Leg press","squat",0],["deadlift","Deadlift","hinge",0],["plank","Plank","core",0,"time"]].map(([id,name,pattern,ps,f])=>({id,name,pattern,ps,bw:f==="bw",time:f==="time"}));
+const CAT=[["barbell_bench_press","Barbell bench press","horizontal_push",0],["db_bench_press","Dumbbell bench press","horizontal_push",1],["db_shoulder_press","Dumbbell shoulder press","vertical_push",1],["overhead_press","Overhead press","vertical_push",0],["barbell_row","Barbell row","horizontal_pull",0],["db_row","Dumbbell row","horizontal_pull",1],["pull_up","Pull-up","vertical_pull",0,"bw"],["back_squat","Back squat","squat",0],["leg_press","Leg press","squat",0],["deadlift","Deadlift","hinge",0],["incline_bench_press","Incline bench press","horizontal_push",0],["lat_pulldown","Lat pulldown","vertical_pull",0],["face_pull","Face pull","horizontal_pull",0],["curl","Curl","elbow_flexion",0],["tricep_pushdown","Triceps pushdown","elbow_extension",0],["single_leg_press","Single leg press","squat",0],["plank","Plank","core",0,"time"]].map(([id,name,pattern,ps,f])=>({id,name,pattern,ps,bw:f==="bw",time:f==="time"}));
 const lbk=x=>imp()?r2(x*2.20462):x,unitW=()=>imp()?'lb':'kg';
 const vol=(e,sets,bw)=>sets.reduce((s,t)=>s+(t.reps||0)*((e.bw?bw:0)+(t.weight_kg||0))*(e.ps?2:1),0);
 const e1rm=t=>t.reps?t.weight_kg*(1+t.reps/30):0;
@@ -200,6 +252,13 @@ async function sync(){
   for(const r of by[k]){r._s=1;await put(r)}}
  localStorage.cfg=JSON.stringify({...cfg(),last:Date.now()});
 }
+async function pull(){const c=cfg();if(!c.repo||!c.token)throw new Error('Add repo and token in settings.');
+ const have=new Set((await all()).map(r=>r.id));
+ for(const k of['body','nutrition','cardio','lift']){
+  const g=await fetch(`https://api.github.com/repos/${c.repo}/contents/data/${k}.jsonl`,{headers:{Authorization:'Bearer '+c.token,Accept:'application/vnd.github+json'}});
+  if(g.status===404)continue;if(!g.ok)throw new Error('GitHub read failed ('+g.status+').');
+  for(const l of unb64((await g.json()).content).split('\n').filter(Boolean)){const r=JSON.parse(l);if(!have.has(r.id))await put({...r,_s:1})}}}
+$('#pull').onclick=async()=>{$('#hs').textContent='Restoring…';try{await pull();$('#hs').textContent='Restored from GitHub.'}catch(e){$('#hs').textContent=e.message}await render()};
 const run=async()=>{$('#hs').textContent='Syncing…';try{await sync();$('#hs').textContent='Synced.'}catch(e){$('#hs').textContent=e.message}await render()};
 const autoSync=()=>{const c=cfg();if(navigator.onLine&&c.repo&&c.token)run()};
 $('#syncNow').onclick=run;
