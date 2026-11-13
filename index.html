@@ -910,14 +910,21 @@ $('#sx').onchange=()=>{ls('sx',$('#sx').value);renderTrends()};
 const b64=t=>{let s='';new TextEncoder().encode(t).forEach(b=>s+=String.fromCharCode(b));return btoa(s)};
 const unb64=t=>new TextDecoder().decode(Uint8Array.from(atob(t.replace(/\s/g,'')),ch=>ch.charCodeAt(0)));
 const H=c=>({Authorization:'Bearer '+c.token,Accept:'application/vnd.github+json'});
-const ghErr=(s,what)=>new Error(s===401?'GitHub rejected the token (401). Paste a new one below.':s===403?'Token lacks write access to this repo, or rate limited (403).':s===404?'Repo not found, or the token can’t see it (404). Check owner/name.':`GitHub ${what} failed (${s}).`);
+const ghErr=(s,what,r)=>{
+ const rl=r&&r.headers.get('x-ratelimit-remaining')==='0';
+ return new Error(s===401?'GitHub rejected the token (401): expired or revoked. Paste a new one below.'
+  :s===403&&rl?'GitHub rate limit reached (403). Sync will work again within the hour.'
+  :s===403&&what==='write'?'Token can read but not write (403). On GitHub: Settings > Developer settings > Fine-grained tokens > your token > Repository permissions > Contents: set to “Read and write”. No need to paste it again.'
+  :s===403?'Token is not allowed to access this repo (403). Check the token’s repository access includes it.'
+  :s===404?'Repo not found, or the token can’t see it (404). Check owner/name and the token’s repository access.'
+  :`GitHub ${what} failed (${s}).`)};
 const parseLines=t=>t.split('\n').map(l=>{try{return l.trim()?JSON.parse(l):null}catch(e){return null}}).filter(r=>r&&r.id);
 async function getFile(c,k){
  const url=`https://api.github.com/repos/${c.repo}/contents/data/${k.includes('.')?k:k+'.jsonl'}`;
  const g=await fetch(url,{headers:H(c),cache:'no-store'});
- if(g.status===404)return{url,text:''};if(!g.ok)throw ghErr(g.status,'read');
+ if(g.status===404)return{url,text:''};if(!g.ok)throw ghErr(g.status,'read',g);
  const j=await g.json();let text=j.content?unb64(j.content):'';
- if(!text&&j.size>0){const b=await fetch(j.git_url,{headers:H(c),cache:'no-store'});if(!b.ok)throw ghErr(b.status,'read');text=unb64((await b.json()).content)}  // files >1 MB
+ if(!text&&j.size>0){const b=await fetch(j.git_url,{headers:H(c),cache:'no-store'});if(!b.ok)throw ghErr(b.status,'read',b);text=unb64((await b.json()).content)}  // files >1 MB
  return{url,text,sha:j.sha}}
 async function syncAll(){
  const c=cfg();if(!c.repo||!c.token)throw new Error('Add your data repo and token below.');
@@ -933,14 +940,14 @@ async function syncAll(){
    const p=await fetch(f.url,{method:'PUT',headers:H(c),body:JSON.stringify({message:`log ${k} +${add.length}`,content:b64(text),sha:f.sha})});
    if(p.ok)break;
    if((p.status===409||p.status===422)&&a<2){f=await getFile(c,k);remote=parseLines(f.text);continue}  // someone else wrote first: re-read and retry
-   throw ghErr(p.status,'write')}
+   throw ghErr(p.status,'write',p)}
   await putAll(mine.map(r=>({...r,_s:1})))}
  // weekly plan: one JSON file, newest `updated` wins
  const tf=await getFile(c,'template.json');let rt=null;try{rt=tf.text?JSON.parse(tf.text):null}catch(e){}
  if(rt&&rt.days&&(rt.updated||0)>(TPL.updated||0)){TPL=rt;ls('template',TPL)}
  else if(!rt||!rt.days||(TPL.updated||0)>(rt.updated||0)){
   const p=await fetch(tf.url,{method:'PUT',headers:H(c),body:JSON.stringify({message:'plan update',content:b64(JSON.stringify(TPL,null,1)+'\n'),sha:tf.sha})});
-  if(!p.ok&&p.status!==409&&p.status!==422)throw ghErr(p.status,'write')}
+  if(!p.ok&&p.status!==409&&p.status!==422)throw ghErr(p.status,'write',p)}
  setCfg({last:Date.now()})}
 async function run(){
  if(syncing){again=true;return syncing}
