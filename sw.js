@@ -1,7 +1,7 @@
 // Offline app shell. Stale-while-revalidate: opens instantly from cache,
 // fetches the latest version in the background (visible on next launch).
 // Never touches GitHub API traffic.
-const CACHE = 'log-v2';
+const CACHE = 'log-v3';
 const SHELL = ['./', 'index.html', 'manifest.webmanifest', 'icon-180.png', 'icon-512.png'];
 
 self.addEventListener('install', e => {

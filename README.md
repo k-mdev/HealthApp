@@ -12,6 +12,12 @@ and syncs to a **private** GitHub repo as append-only JSONL (see SCHEMA.md).
 3. Open the installed app > Sync tab: enter `owner/HealthData` (a full GitHub URL also works) + token > Save & sync.
 
 ## Using it
+- **Today** (home): AM/PM stretch toggles, weight quick-entry, today's session from the weekly plan, and the AM / PM / Gym week grid.
+  Each set row is prefilled (last weight; +5 lb upper / +10 lb lower when every set hit the top of the range last time). Tap ✓ to log it.
+  Tap a number to adjust it (changes carry to later sets). An exercise saves when its last set is checked. Tap the exercise name (⇄) to swap to its alternative.
+  The cardio line always comes after the lifts and logs the suggested activity with one tap.
+- Weekly plan: Lift tab > Edit weekly plan (add/remove/reorder, sets/reps, alternatives, main lifts, cardio slot, swap days).
+- Cardio tab: weekly meter (run distance, cardio minutes, hard sessions) and leg-day warnings. Warnings only, never blocks.
 - The date chip (top right) back-dates entries for every tab; it turns orange when not on today.
 - Every save shows an Undo toast; every list row has a delete button.
 - Lift: −/+ steppers, sets in progress survive app restarts, switching exercise auto-saves the current sets.
